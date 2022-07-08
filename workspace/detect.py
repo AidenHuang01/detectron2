@@ -17,6 +17,10 @@ import numpy as np
 import os, json, cv2, random
 from tqdm import tqdm
 import pickle
+from pathlib import Path
+import os
+
+
 
 # import some common detectron2 utilities
 from detectron2 import model_zoo
@@ -27,9 +31,8 @@ from detectron2.data import MetadataCatalog, DatasetCatalog
 
 # Constances
 IMAGE_DIR = "./images/"
-
-import os
-images_list = os.listdir(IMAGE_DIR)
+DATA_PATH = "/yucheng/experiment/"
+OUTPUT_PATH = "/yucheng/output/"
 
 # load model
 cfg = get_cfg()
@@ -41,24 +44,32 @@ cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url("COCO-Detection/faster_rcnn_R_5
 predictor = DefaultPredictor(cfg)
 print("load model successful")
 
-# forward
-outputs = None
-print(f"detecting on {len(images_list)} frames:")
-for i in tqdm(range(len(images_list))):
-  image_name = images_list[i]
-  image_num = image_name[:4]
-  image_path = "./images/" + image_name
-  output_file_name = "./output/" +image_num + "_pred_dict_2D.pickle"
-  im = cv2.imread(image_path)
-  outputs = predictor(im)
-  instances = outputs["instances"]
-  outputs["instances"] = instances[instances.pred_classes == 2]
-  pred_boxes = outputs["instances"].pred_boxes.tensor.cpu().detach().numpy()
-  pred_scores = outputs["instances"].scores.cpu().detach().numpy()
-  pred_classes = outputs["instances"].pred_classes.cpu().detach().numpy()
-  pred_dict_2D = {}
-  pred_dict_2D["boxes"] = pred_boxes
-  pred_dict_2D["scores"] = pred_scores
-  pred_dict_2D["classes"] = pred_classes
-  with open(output_file_name, 'wb') as handle:
-      pickle.dump(pred_dict_2D, handle)
+test_list = os.listdir(DATA_PATH)
+print(f"start detection under {DATA_PATH}")
+for test_name in tqdm(test_list):
+  images_path = DATA_PATH + test_name + "/mtlb-pngFromBag"
+  images_list = os.listdir(images_path)
+  # forward
+  outputs = None
+  print(f"detecting on {test_name} with {len(images_list)} frames:")
+  for i in tqdm(range(len(images_list))):
+    image_name = images_list[i]
+    image_num = image_name[:4]
+    image_path = DATA_PATH + test_name + "/mtlb-pngFromBag/" + image_name
+    output_file_name = OUTPUT_PATH + test_name + "/2D_boxes/" + image_num + ".pickle"
+
+    im = cv2.imread(image_path)
+    outputs = predictor(im)
+    instances = outputs["instances"]
+    outputs["instances"] = instances[instances.pred_classes == 2]
+    pred_boxes = outputs["instances"].pred_boxes.tensor.cpu().detach().numpy()
+    pred_scores = outputs["instances"].scores.cpu().detach().numpy()
+    pred_classes = outputs["instances"].pred_classes.cpu().detach().numpy()
+    pred_dict_2D = {}
+    pred_dict_2D["boxes"] = pred_boxes
+    pred_dict_2D["scores"] = pred_scores
+    pred_dict_2D["classes"] = pred_classes
+    output_file = Path(output_file_name)
+    output_file.parent.mkdir(exist_ok=True, parents=True)
+    with open(output_file_name, 'wb') as handle:
+        pickle.dump(pred_dict_2D, handle)
